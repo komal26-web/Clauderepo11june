@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@3/index.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shadcn/ui@latest/dist/styles.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .dashboard {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        .header {
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1a1a1a;
+        }
+        .content {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 30px;
+        }
+        .calendar-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .date-picker {
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+        .date-picker:hover {
+            background: #f9fafb;
+        }
+        .date-display {
+            font-size: 16px;
+            font-weight: 500;
+            color: #1a1a1a;
+            padding: 12px 0;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 15px;
+        }
+        .sessions {
+            flex: 1;
+        }
+        .sessions-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #1a1a1a;
+        }
+        .session-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f9fafb;
+        }
+        .session-item:hover {
+            background: #f3f4f6;
+        }
+        .session-type {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .session-type.event {
+            background: #dbeafe;
+            color: #0c4a6e;
+        }
+        .session-type.task {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .session-type.reminder {
+            background: #fde2e4;
+            color: #9f1239;
+        }
+        .session-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        .session-description {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        .session-meta {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7280;
+        }
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        .empty-state-text {
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="dashboard">
+            <div class="header">
+                <h1>📅 Calendar Dashboard</h1>
+            </div>
+
+            <div class="content">
+                <div class="calendar-section">
+                    <input
+                        type="date"
+                        id="datePicker"
+                        class="date-picker"
+                    >
+                    <div id="formattedDate" class="date-display"></div>
+                </div>
+
+                <div class="sessions">
+                    <h2 class="sessions-title">Sessions</h2>
+                    <div id="sessionsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const datePicker = document.getElementById('datePicker');
+        const formattedDate = document.getElementById('formattedDate');
+        const sessionsList = document.getElementById('sessionsList');
+
+        function formatDateOrdinal(date) {
+            const dateObj = new Date(date);
+            const options = { day: 'numeric', month: 'long', year: 'numeric' };
+            const formatter = new Intl.DateTimeFormat('en-US', options);
+            const parts = formatter.formatToParts(dateObj);
+
+            const dayPart = parts.find(p => p.type === 'day');
+            const monthPart = parts.find(p => p.type === 'month');
+            const yearPart = parts.find(p => p.type === 'year');
+
+            const day = parseInt(dayPart.value);
+            const suffix = ['st', 'nd', 'rd'][((day % 10) - 1)] || 'th';
+
+            return `${day}${suffix} ${monthPart.value} ${yearPart.value}`;
+        }
+
+        function setCurrentDate() {
+            const today = new Date();
+            const isoDate = today.toISOString().split('T')[0];
+            datePicker.value = isoDate;
+            updateFormattedDate(isoDate);
+            fetchSessions(isoDate);
+        }
+
+        function updateFormattedDate(isoDate) {
+            formattedDate.textContent = formatDateOrdinal(isoDate);
+        }
+
+        async function fetchSessions(isoDate) {
+            try {
+                const response = await fetch(`/api/sessions?date=${isoDate}`);
+                const data = await response.json();
+                renderSessions(data);
+            } catch (error) {
+                console.error('Error fetching sessions:', error);
+                sessionsList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">Error loading sessions</div></div>';
+            }
+        }
+
+        function renderSessions(data) {
+            const allSessions = [
+                ...data.events,
+                ...data.tasks,
+                ...data.reminders
+            ];
+
+            if (allSessions.length === 0) {
+                sessionsList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">No sessions for this date</div></div>';
+                return;
+            }
+
+            sessionsList.innerHTML = allSessions.map(session => `
+                <div class="session-item">
+                    <div class="session-type ${session.type}">${session.type}</div>
+                    <div class="session-title">${session.title}</div>
+                    ${session.description ? `<div class="session-description">${session.description}</div>` : ''}
+                    <div class="session-meta">
+                        ${session.time ? `⏰ ${session.time}` : ''}
+                        ${session.completed !== undefined ? `${session.completed ? '✓ Completed' : '○ Pending'}` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        datePicker.addEventListener('change', (e) => {
+            updateFormattedDate(e.target.value);
+            fetchSessions(e.target.value);
+        });
+
+        setCurrentDate();
+    </script>
+</body>
+</html>
